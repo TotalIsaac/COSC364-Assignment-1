@@ -48,8 +48,6 @@ def config(filename, router_id, input_ports, outputs, timers):
         router_id= int(setup["router-id"][0])
 
 
-    ### TODO There needs to be some way of checking that the router id is unique. 
-
     #Checks input ports fall between required value, and that they occur no more than once.
     #If these requirements pass, it is added to the list of input_ports
     ## UNSURE if it should be possible to not have any input_ports
