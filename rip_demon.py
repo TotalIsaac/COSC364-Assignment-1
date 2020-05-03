@@ -4,12 +4,11 @@ import os.path
 
 def rip_demon(filename):
     """RIP demon. Handles basically everything"""
-    router_id = ""
-    input_ports, outputs, timers = [], [], []
+    router_id, timers = "", ""
+    input_ports, outputs = [], []
     
     #Run the config
-    router_id = config(filename, router_id, input_ports, outputs, timers)
-    print(filename, router_id, input_ports, outputs)
+    router_id, timers = config(filename, router_id, input_ports, outputs, timers)
 
     
     
@@ -20,7 +19,6 @@ def config(filename, router_id, input_ports, outputs, timers):
 
     setup = {}
     
-
     #If the file doesn't exist, exit
     if not os.path.isfile(filename):
         print("There is no config file with this name")
@@ -33,7 +31,6 @@ def config(filename, router_id, input_ports, outputs, timers):
             if(items[0][:2] != '//'):
                 key, values = items[0], items[1:]
                 setup[key] = values
-    print(setup)
 
     #Check the require elements are present in the config
     if ("router-id" or "input-ports" or "outputs") not in setup:
@@ -47,10 +44,8 @@ def config(filename, router_id, input_ports, outputs, timers):
     else:
         router_id= int(setup["router-id"][0])
 
-
     #Checks input ports fall between required value, and that they occur no more than once.
     #If these requirements pass, it is added to the list of input_ports
-    ## UNSURE if it should be possible to not have any input_ports
     for port in setup["input-ports"]:
         port = int(port)
         if  port < 1024 or port > 64000:
@@ -63,10 +58,8 @@ def config(filename, router_id, input_ports, outputs, timers):
             else:
                 input_ports.append(port)
         
-    
     #Checks port falls within required values and isn't in input ports.
     #Ensures metrics are non-negative
-    ## UNSURE what further checks should be done on outputs
     for outs in setup["outputs"]:
         outs = outs.split('-')
         if not (int(outs[0]) >= 1024 or int(outs[0]) <= 64000):
@@ -78,13 +71,19 @@ def config(filename, router_id, input_ports, outputs, timers):
         elif int(outs[1]) < 0:
             print("metric values must be non-negative")
             sys.exit()
+        elif int(outs[2]) < 1 or int(outs[2]) > 64000:
+            print("Neighbouring router id must be between 1 and 64000")
+            sys.exit()
         else:
             outputs.append(outs)
     
-    ### TODO Some timer related checks
+    #Checks timer field is present and whether it is of the required ratio
+    if "timer" in setup.keys():
+        if int(setup["timer"][0]) / int(setup["timer"][1]) != 6:
+            print("Timeout/periodic ration must equal 6")
+            sys.exit()
 
-    #Can just return the router ID as the lists remain modified within the scope of rip_demon()
-    return router_id
+    return router_id, timers
 
 
 
