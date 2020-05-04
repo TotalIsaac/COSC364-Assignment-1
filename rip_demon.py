@@ -82,7 +82,10 @@ def config(filename, router_id, input_ports, outputs, timers):
         if int(setup["timer"][0]) / int(setup["timer"][1]) != 6:
             print("Timeout/periodic ration must equal 6")
             sys.exit()
-
+            
+    #Send UDP packet that contains routing information to other neighbor        
+    opened_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    opened_socket.sendto(router_id, ("127.0.0.1", 5005))
     return router_id, timers
 
 
