@@ -21,3 +21,4 @@ on space after each parameter, and each value for that parameter. E.g:
 Notes: 
 30/4 - None of the protocol has been implemented yet. I've mostly just done the config file.
        It's functional for the most part, but still has some unfinished elements
+6/5 - Unsure how to go about dealing with the sockets.

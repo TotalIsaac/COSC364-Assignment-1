@@ -1,14 +1,40 @@
 import socket
 import sys
 import os.path
+import json
 
 def rip_demon(filename):
     """RIP demon. Handles basically everything"""
     router_id, timers = "", ""
     input_ports, outputs = [], []
+    receive_ports = {}
+    routing_table = {} # key by router-id, value [port (next hop), metric, timer?] 
     
     #Run the config
     router_id, timers = config(filename, router_id, input_ports, outputs, timers)
+
+    #Initial table
+    for router in outputs:
+        routing_table[router[2]] = [router[0], router[1]]
+
+    #Create UDP sockets for each input port
+    for port in input_ports:
+        receive_ports[port] = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        receive_ports[port].bind("127.0.0.1", port)
+        
+    while True:
+        #Check each port for data.
+        #If data there, compare routing tables and update if needed
+        for port in receive_ports:
+            port.listen()
+
+        #Send data about own table.
+    
+
+
+    #Send UDP packet that contains routing information to other neighbor        
+    opened_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    opened_socket.sendto(router_id, ("127.0.0.1", 5005))
 
     
     
@@ -44,8 +70,7 @@ def config(filename, router_id, input_ports, outputs, timers):
     else:
         router_id= int(setup["router-id"][0])
 
-    #Checks input ports fall between required value, and that they occur no more than once.
-    #If these requirements pass, it is added to the list of input_ports
+    #Checks input ports fall meet requirements, then adds them to list.
     for port in setup["input-ports"]:
         port = int(port)
         if  port < 1024 or port > 64000:
@@ -58,8 +83,7 @@ def config(filename, router_id, input_ports, outputs, timers):
             else:
                 input_ports.append(port)
         
-    #Checks port falls within required values and isn't in input ports.
-    #Ensures metrics are non-negative
+    #Checks output port falls within required values and isn't in input ports.
     for outs in setup["outputs"]:
         outs = outs.split('-')
         if not (int(outs[0]) >= 1024 or int(outs[0]) <= 64000):
@@ -83,11 +107,61 @@ def config(filename, router_id, input_ports, outputs, timers):
             print("Timeout/periodic ration must equal 6")
             sys.exit()
             
-    #Send UDP packet that contains routing information to other neighbor        
-    opened_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    opened_socket.sendto(router_id, ("127.0.0.1", 5005))
     return router_id, timers
 
+
+def packet_prep(rt_table, rt_id):
+    """Prepares a RIP packet into a bytearray. Takes the routing table and 
+    the id of the sending router"""
+    bin_table = dict_to_binary(rt_table)
+    
+    packet = bytearray()
+    packet.append(2) #Command is always a response (2) for this assignment. 
+    packet.append(2) #Version is always 2
+    packet.append(rt_id >> 8)
+    packet.append(rt_id & 0xFF)
+    packet += bin_table
+
+    return packet
+
+def read_packet(packet):
+    """Reads a received packet. Runs through checks and returns the routing table & sender info"""
+    command = packet[0]
+    version = packet[1]
+    rt_id = packet[2] << 8 | packet[3]
+    table = binary_to_dict(packet[4:])
+
+    if command != 2 or version != 2:
+        return 1
+    elif int(rt_id) > 64000 or int(rt_id) < 1:
+        return 1
+    else:
+        return table, rt_id
+
+def dict_to_binary(dct):
+    """Converts a dict to binary"""
+    s = json.dumps(dct).encode('utf-8')
+    return s
+
+
+def binary_to_dict(binary):
+    """Converts binary to a dict"""
+    d = json.loads(binary.decode('utf-8'))  
+    return d
+
+
+def distance_vec(table, recv_table, metric, recv_port):
+    """Compares routes between the main routing table, and those received. Checks if a 
+    received route is more cost effective. If so, it replaces that route in the main table."""
+    
+    for route in recv_table:
+        if route not in table:
+            met = recv_table[route][1] + metric
+            if met > 16: #16 is infinity as far as RIP is concerned
+                met = 16
+            table[route] = [recv_port, met] 
+        elif (recv_table[route][1] + metric) < (table[route][1]):
+            table[route] = [recv_port, recv_table[route][1] + metric]
 
 
 def main():
