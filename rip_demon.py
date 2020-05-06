@@ -19,6 +19,7 @@ def rip_demon(filename):
 
     #Create UDP sockets for each input port
     for port in input_ports:
+        sending_packet(port, "127.0.0.1")  
         receive_ports[port] = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         receive_ports[port].bind("127.0.0.1", port)
         
@@ -28,15 +29,7 @@ def rip_demon(filename):
         for port in receive_ports:
             port.listen()
 
-        #Send data about own table.
-    
-
-
-    #Send UDP packet that contains routing information to other neighbor        
-    opened_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    opened_socket.sendto(router_id, ("127.0.0.1", 5005))
-
-    
+        #Send data about own table  
     
 
 
@@ -109,6 +102,18 @@ def config(filename, router_id, input_ports, outputs, timers):
             
     return router_id, timers
 
+def sending_packet(port, ip):
+
+    #Send UDP packet that contains routing information to other neighbor        
+    try: 
+        sckt = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
+        print "Socket successfully created"
+    except socket.error as err: 
+        print "socket creation failed with error %s" %(err)
+        
+    # connecting to the server 
+    sckt.connect(ip, port)     
+    
 
 def packet_prep(rt_table, rt_id):
     """Prepares a RIP packet into a bytearray. Takes the routing table and 
