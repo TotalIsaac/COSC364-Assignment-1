@@ -39,18 +39,16 @@ def rip_demon(filename):
         recv_table, recv_rt_id = read_packet(message)
         conn.close() ##UNSURE about sending response packets etc
         distance_vec(routing_table, recv_table, routing_table[recv_rt_id][1], recv_rt_id)
-        ###TODO check if there has been any change in the routing table and send an update
-        ### if it has changed
-
+        if(routing_table != recv_table):
+            for row in routing_table:
+                if row not in recv_table:
+                    routing_table.add(row)
         #Send update after specified time has elapsed
         if(time.time() - curr_time >= timers[1]):
             curr_time = time.time()
             packet = packet_prep(routing_table, router_id)
-            ###TODO Actually get the routing info send through to another client
-
         
-        ###TODO Deal with timeouts, removing invalid entries in the routing table,
-        ### garbage collection, etc
+        ready_server.sendto(packet, (conn, addr))
 
     
 
