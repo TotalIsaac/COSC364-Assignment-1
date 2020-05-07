@@ -2,16 +2,19 @@ import socket
 import sys
 import os.path
 import json
+import select
+import time
 
 def rip_demon(filename):
     """RIP demon. Handles basically everything"""
-    router_id, timers = "", ""
-    input_ports, outputs = [], []
-    receive_ports = {}
+    router_id = ""
+    input_ports, outputs, timers = [], [], []
+    recv_ports = []
     routing_table = {} # key by router-id, value [port (next hop), metric, timer?] 
+    curr_time = time.time()
     
     #Run the config
-    router_id, timers = config(filename, router_id, input_ports, outputs, timers)
+    router_id = config(filename, router_id, input_ports, outputs, timers)
 
     #Initial table
     for router in outputs:
@@ -20,16 +23,35 @@ def rip_demon(filename):
     #Create UDP sockets for each input port
     for port in input_ports:
         sending_packet(port, "127.0.0.1")  
-        receive_ports[port] = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        receive_ports[port].bind("127.0.0.1", port)
+        new_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        new_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        new_socket.bind("127.0.0.1", port)
+        new_socket.listen(5)
+        recv_ports.append(new_socket)
         
     while True:
-        #Check each port for data.
-        #If data there, compare routing tables and update if needed
-        for port in receive_ports:
-            port.listen()
+        #select.select() returns three list objects. From what I've read, [0][0] is the
+        #socket we want
+        ready_server = select.select(recv_ports, [], [])[0][0]
+        conn, addr = ready_server.accept()
 
-        #Send data about own table  
+        message = conn.recv(4096)
+        recv_table, recv_rt_id = read_packet(message)
+        conn.close() ##UNSURE about sending response packets etc
+        distance_vec(routing_table, recv_table, routing_table[recv_rt_id][1], recv_rt_id)
+        ###TODO check if there has been any change in the routing table and send an update
+        ### if it has changed
+
+        #Send update after specified time has elapsed
+        if(time.time() - curr_time >= timers[1]):
+            curr_time = time.time()
+            packet = packet_prep(routing_table, router_id)
+            ###TODO Actually get the routing info send through to another client
+
+        
+        ###TODO Deal with timeouts, removing invalid entries in the routing table,
+        ### garbage collection, etc
+
     
 
 
@@ -99,22 +121,25 @@ def config(filename, router_id, input_ports, outputs, timers):
         if int(setup["timer"][0]) / int(setup["timer"][1]) != 6:
             print("Timeout/periodic ration must equal 6")
             sys.exit()
+        else:
+            timers.append(int(setup["timer"][0]))
+            timers.append(int(setup["timer"][1])
+        
             
-    return router_id, timers
+    return router_id
 
 def sending_packet(port, ip):
 
     #Send UDP packet that contains routing information to other neighbor        
     try: 
         sckt = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
-        print "Socket successfully created"
+        print("Socket successfully created")
     except socket.error as err: 
-        print "socket creation failed with error %s" %(err)
+        print("socket creation failed with error %s" %(err))
         
     # connecting to the server 
     sckt.connect(ip, port)     
     
-
 def packet_prep(rt_table, rt_id):
     """Prepares a RIP packet into a bytearray. Takes the routing table and 
     the id of the sending router"""
@@ -148,12 +173,10 @@ def dict_to_binary(dct):
     s = json.dumps(dct).encode('utf-8')
     return s
 
-
 def binary_to_dict(binary):
     """Converts binary to a dict"""
     d = json.loads(binary.decode('utf-8'))  
     return d
-
 
 def distance_vec(table, recv_table, metric, recv_port):
     """Compares routes between the main routing table, and those received. Checks if a 
@@ -167,7 +190,6 @@ def distance_vec(table, recv_table, metric, recv_port):
             table[route] = [recv_port, met] 
         elif (recv_table[route][1] + metric) < (table[route][1]):
             table[route] = [recv_port, recv_table[route][1] + metric]
-
 
 def main():
     """Main. Running the file from command line will start it here"""
