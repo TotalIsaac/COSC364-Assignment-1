@@ -1,3 +1,7 @@
+"""RIP Assignment
+Authors: Isaac Walton - ijw21 - 33627090
+         Thien BUI - lhb44 - 38715785"""
+
 import socket
 import sys
 import os.path
@@ -32,32 +36,29 @@ def rip_demon(filename):
     send_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
     while True:
-        #select.select() returns three list objects. From what I've read, [0][0] is the
-        #socket we want
 
-        serv = select.select(recv_ports, [], [], 3)
+        #Check if any socket ready to listen. Get data if they are and update the table
+        serv = select.select(recv_ports, [], [], 2)
         if len(serv[0]) > 0:
             ready_server = serv[0][0]
             message, addr = ready_server.recvfrom(4096)
             recv_table, recv_rt_id = read_packet(message)
-            print(routing_table)
             if distance_vec(routing_table, recv_table, routing_table[str(recv_rt_id)][1], recv_rt_id, router_id):
                 send_pack(routing_table, router_id, outputs, send_socket, input_ports)
          
         #Send update after specified time has elapsed
         if(time.time() - curr_time >= timers[1]):
+            print(routing_table)
             send_pack(routing_table, router_id, outputs, send_socket, input_ports)
             curr_time = time.time()
         
-        ###TODO Deal with timeouts, removing invalid entries in the routing table,
-        ### garbage collection, etc 
+        #Check if timeout has passed and kill the route.
         for route in routing_table:
             if (time.time() - routing_table[route][2] >= timers[0]):
                 routing_table[route][1] = 16
                 routing_table[route][2] = time.time()
+                check_unreach(routing_table, outputs)
                 send_pack(routing_table, router_id, outputs, send_socket, input_ports)
-
-
 
     
 def send_pack(routing_table, router_id, outputs, send_socket, inputs):
@@ -66,14 +67,24 @@ def send_pack(routing_table, router_id, outputs, send_socket, inputs):
     for out in outputs:
         send_table = copy.deepcopy(routing_table)
         for route in routing_table:
-            if send_table[route][0] == int(out[0]):
+            if routing_table[route][0] == int(out[0]):
                 send_table[route][1] = 16
-                send_table[str(router_id)] = [inputs[0], out[1], time.time()]
+                send_table[str(router_id)] = [inputs[0], out[1], time.time(), 'dir']
                 packet = packet_prep(send_table, router_id)
             else:
-                send_table[str(router_id)] = [inputs[0], out[1], time.time()]
+                
+                send_table[str(router_id)] = [inputs[0], out[1], time.time(), 'dir']
                 packet = packet_prep(send_table, router_id)
         send_socket.sendto(packet, ("127.0.0.1", int(out[0])))
+
+def check_unreach(table, outputs):
+    """Checks if a route is unreachable, and sets to infinity if it is"""
+    for out in outputs:
+        if table[str(out[2])][1] == 16:
+            for route in table:
+                if str(table[route][0]) == str(out[0]):
+                    table[route][1] = 16
+
 
 def config(filename, router_id, input_ports, outputs, timers):
     """Reads the provided config file and performs the required checks"""
@@ -197,27 +208,21 @@ def distance_vec(table, recv_table, metric, recv_rt, self_rt_id):
         table[str(recv_rt)][2] = time.time()
 
     for route in recv_table:
-        if route == self_rt_id:
-            pass #Ignore entry routing to self
-        elif route not in table:
+        if route == self_rt_id: #Ignore entry routing to self
+            pass 
+        elif route not in table: #If route not known, add it
             met = int(recv_table[route][1]) + int(metric)
-            if met > 16: #16 is infinity as far as RIP is concerned
+            if met > 16: 
                 met = 16
             table[route] = [recv_port, met, time.time()] 
             change = True
-        elif (recv_table[route][1] + metric) < (table[route][1]):
+        elif (recv_table[route][1] + metric) < (table[route][1]): #New route better? Update it
             table[route] = [recv_port, recv_table[route][1] + metric, time.time()]
             change = True
-        elif (recv_table[route][1] + metric) == (table[route][1]) and (recv_port == table[route][0]):
-            table[route][2] = time.time()
-        elif table[route][0] == table[str(recv_rt)][0]:
-            met = int(recv_table[route][1]) + int(metric)
-            if met > 16: #16 is infinity as far as RIP is concerned
-                met = 16
-            table[route] = [recv_port, met, time.time()] 
+        elif len(recv_table[route]) == 4 and table[route][1] == 16:
+            table[route] = [recv_port, recv_table[route][1], time.time()]
             change = True
 
-    
     return change #If there is a change to the routing table, return true to trigger update
 
 def main():
