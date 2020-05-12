@@ -1,0 +1,5 @@
+// Config file for router 5
+router-id 5
+input-ports 5054 5056
+outputs 5065-1-6 5045-2-4
+timer 18 3

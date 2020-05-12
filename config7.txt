@@ -1,0 +1,5 @@
+// Config file for router 7
+router-id 7
+input-ports 5071 5074
+outputs 5047-6-4 5017-8-1
+timer 18 3

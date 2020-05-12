@@ -1,0 +1,5 @@
+// Config file for router 4
+router-id 4
+input-ports 5043 5047 5045
+outputs 5074-6-7 5034-4-3 5054-3-5
+timer 18 3

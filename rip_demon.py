@@ -11,7 +11,8 @@ import time
 import copy
 
 def rip_demon(filename):
-    """RIP demon. Handles basically everything"""
+    """RIP demon. Calls all the supporting functions, and arranges packet sending, routing 
+    table updates etc"""
     router_id = ""
     input_ports, outputs, timers = [], [], []
     recv_ports = []
@@ -48,7 +49,7 @@ def rip_demon(filename):
          
         #Send update after specified time has elapsed
         if(time.time() - curr_time >= timers[1]):
-            print(routing_table)
+            print_routing(routing_table, router_id)
             send_pack(routing_table, router_id, outputs, send_socket, input_ports)
             curr_time = time.time()
         
@@ -224,6 +225,12 @@ def distance_vec(table, recv_table, metric, recv_rt, self_rt_id):
             change = True
 
     return change #If there is a change to the routing table, return true to trigger update
+
+def print_routing(table, router):
+    """Prints a routing table"""
+    print("Router", router)
+    for router in table:
+        print(router + ": ", table[router][:2])
 
 def main():
     """Main. Running the file from command line will start it here"""

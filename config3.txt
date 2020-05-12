@@ -1,0 +1,5 @@
+// Config file for router 3
+router-id 3
+input-ports 5032 5034
+outputs 5023-3-2 5043-4-4
+timer 18 3

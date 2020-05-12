@@ -1,0 +1,5 @@
+// Config file for router 6
+router-id 6
+input-ports 5065 5061
+outputs 5056-1-5 5016-5-1
+timer 18 3

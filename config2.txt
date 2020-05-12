@@ -1,0 +1,5 @@
+// Config file for router 2
+router-id 2
+input-ports 5021 5023
+outputs 5032-3-3 5012-1-1
+timer 18 3
